@@ -10,7 +10,7 @@ namespace FitterFuncs{
   PulseShapeFunctor::PulseShapeFunctor(const HcalPulseShapes::Shape& pulse,
 				       bool iPedestalConstraint, bool iTimeConstraint,bool iAddPulseJitter,bool iAddTimeSlew,
 				       double iPulseJitter,double iTimeMean,double iTimeSig,double iPedMean,double iPedSig,
-				       double iNoise) : 
+				       double iNoise, double iTS4Max) : 
     cntNANinfit(0),
     acc25nsVec(HcalConst::maxPSshapeBin), diff25nsItvlVec(HcalConst::maxPSshapeBin),
     accVarLenIdxZEROVec(HcalConst::nsPerBX), diffVarItvlIdxZEROVec(HcalConst::nsPerBX), 
@@ -43,6 +43,7 @@ namespace FitterFuncs{
       psFit_erry2[i]  = 1.;
       psFit_slew [i]  = 0.;
     }
+    psFit_tstrig = 0.;
     //Constraints
     pedestalConstraint_ = iPedestalConstraint;
     timeConstraint_     = iTimeConstraint;
@@ -53,6 +54,7 @@ namespace FitterFuncs{
     pedMean_            = iPedMean;
     pedSig_             = iPedSig;
     noise_              = iNoise;
+    ts4Max_             = iTS4Max;
     timeShift_          = 100.;
     timeShift_ += 12.5;//we are trying to get BX 
 
@@ -129,10 +131,20 @@ namespace FitterFuncs{
             else pulse_shape_sum[j] += pulse_shape[j];
          }
       }
-      for (i=0;i<nbins; ++i) {
-        delta2 = (psFit_y[i]- pulse_shape_sum[i])*(psFit_y[i]- pulse_shape_sum[i])/psFit_erry2[i];
-        chisq += delta2;
-      }
+      if(psFit_tstrig<ts4Max_)
+        {
+	  for (i=0;i<nbins; ++i) {
+	    delta2 = (psFit_y[i]- pulse_shape_sum[i])*(psFit_y[i]- pulse_shape_sum[i])/psFit_erry2[i];
+	    chisq += delta2;
+	  }
+	}
+      else
+        {
+          for (i=4;i<6; ++i) {
+            delta2 = (psFit_y[i]- pulse_shape_sum[i])*(psFit_y[i]- pulse_shape_sum[i])/psFit_erry2[i];
+            chisq += delta2;
+          }
+        }
       //Add the pedestal Constraint to chi2
       if(pedestalConstraint_) {
 	chisq += invertpedSig2_*(pars.back() - pedMean_)*(pars.back()- pedMean_);
@@ -228,7 +240,7 @@ void PulseShapeFitOOTPileupCorrection::setPulseShapeTemplate(const HcalPulseShap
    if( cntsetPulseShape ) return;
    ++ cntsetPulseShape;
    psfPtr_.reset(new FitterFuncs::PulseShapeFunctor(ps,pedestalConstraint_,timeConstraint_,addPulseJitter_,applyTimeSlew_,
-								 pulseJitter_,timeMean_,timeSig_,pedMean_,pedSig_,noise_));
+						    pulseJitter_,timeMean_,timeSig_,pedMean_,pedSig_,noise_,ts4Max_));
    spfunctor_    = new ROOT::Math::Functor(psfPtr_.get(),&FitterFuncs::PulseShapeFunctor::singlePulseShapeFunc, 3);
    dpfunctor_    = new ROOT::Math::Functor(psfPtr_.get(),&FitterFuncs::PulseShapeFunctor::doublePulseShapeFunc, 5);
    tpfunctor_    = new ROOT::Math::Functor(psfPtr_.get(),&FitterFuncs::PulseShapeFunctor::triplePulseShapeFunc, 7);
@@ -237,7 +249,7 @@ void PulseShapeFitOOTPileupCorrection::setPulseShapeTemplate(const HcalPulseShap
 void PulseShapeFitOOTPileupCorrection::resetPulseShapeTemplate(const HcalPulseShapes::Shape& ps) { 
    ++ cntsetPulseShape;
    psfPtr_.reset(new FitterFuncs::PulseShapeFunctor(ps,pedestalConstraint_,timeConstraint_,addPulseJitter_,applyTimeSlew_,
-								 pulseJitter_,timeMean_,timeSig_,pedMean_,pedSig_,noise_));
+						    pulseJitter_,timeMean_,timeSig_,pedMean_,pedSig_,noise_,ts4Max_));
    spfunctor_    = new ROOT::Math::Functor(psfPtr_.get(),&FitterFuncs::PulseShapeFunctor::singlePulseShapeFunc, 3);
    dpfunctor_    = new ROOT::Math::Functor(psfPtr_.get(),&FitterFuncs::PulseShapeFunctor::doublePulseShapeFunc, 5);
    tpfunctor_    = new ROOT::Math::Functor(psfPtr_.get(),&FitterFuncs::PulseShapeFunctor::triplePulseShapeFunc, 7);
@@ -312,6 +324,7 @@ int PulseShapeFitOOTPileupCorrection::pulseShapeFit(const double * energyArr, co
    psfPtr_->setpsFiterry (tmperry);
    psfPtr_->setpsFiterry2(tmperry2);
    psfPtr_->setpsFitslew (tmpslew);
+   psfPtr_->setpsFittstrig (tstrig);
    
    //Fit 1 single pulse
    float timevalfit  = 0;
