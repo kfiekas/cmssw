@@ -5,8 +5,8 @@ static const double tzero[3]= {23.960177, 13.307784, 9.109694};
 static const double slope[3] = {-3.178648,  -1.556668, -1.075824 };
 static const double tmax[3] = {16.00, 10.00, 6.25 };
 static const double cap = 6.0;
-static const double tspar0[2] = {10.2627, 9.27638};
-static const double tspar1[2] = {-2.41281,-2.05585};
+static const double tspar0[2] = {11.2537, 12.2999};
+static const double tspar1[2] = {-2.51160,-2.19142};
 
 double HcalTimeSlew::delay(double fC, BiasSetting bias) {
   double rawDelay=tzero[bias]+slope[bias]*log(fC);
